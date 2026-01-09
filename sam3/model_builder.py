@@ -27,7 +27,8 @@ from sam3.model.memory import (
 from sam3.model.model_misc import (
     DotProductScoring,
     MLP,
-    MultiheadAttentionWrapper as MultiheadAttention,
+    MultiheadAttentionWrapper,
+    ExportableMultiheadAttentionWrapper,
     TransformerWrapper,
 )
 from sam3.model.necks import Sam3DualViTDetNeck
@@ -42,6 +43,9 @@ from sam3.model.tokenizer_ve import SimpleTokenizer
 from sam3.model.vitdet import ViT
 from sam3.model.vl_combiner import SAM3VLBackbone
 from sam3.sam.transformer import RoPEAttention
+
+
+MultiheadAttention = ExportableMultiheadAttentionWrapper if str(os.environ.get("EXPORTING_MODEL")).lower() in ["true", "1"] else MultiheadAttentionWrapper
 
 
 # Setup TensorFloat-32 for Ampere GPUs if available
@@ -136,7 +140,7 @@ def _create_transformer_encoder() -> TransformerEncoderFusion:
             dropout=0.1,
             embed_dim=256,
             batch_first=True,
-        ),
+        )
     )
 
     encoder = TransformerEncoderFusion(
@@ -264,7 +268,7 @@ def _create_geometry_encoder():
             dropout=0.1,
             embed_dim=256,
             batch_first=False,
-        ),
+        )
     )
 
     # Create geometry encoder
@@ -541,10 +545,12 @@ def _load_checkpoint(model, checkpoint_path):
         )
     missing_keys, _ = model.load_state_dict(sam3_image_ckpt, strict=False)
     if len(missing_keys) > 0:
-        print(
-            f"loaded {checkpoint_path} and found "
-            f"missing and/or unexpected keys:\n{missing_keys=}"
-        )
+        missing_keys, _ = model.load_state_dict(ckpt, strict=False)
+        if len(missing_keys) > 0:
+            print(
+                f"loaded {checkpoint_path} and found "
+                f"missing and/or unexpected keys:\n{missing_keys=}"
+            )
 
 
 def _setup_device_and_mode(model, device, eval_mode):

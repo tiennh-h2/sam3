@@ -916,7 +916,7 @@ class NormalizeAPI:
                 cur_h, cur_w = datapoint.images[query.image_id].data.shape[-2:]
                 points = points / torch.tensor([cur_w, cur_h, 1.0], dtype=torch.float32)
                 query.input_points = points
-
+        
         return datapoint
 
 

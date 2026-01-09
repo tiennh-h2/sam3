@@ -332,27 +332,34 @@ class TransformerDecoder(nn.Module):
         H, W = feat_size
         boxes_xyxy = box_cxcywh_to_xyxy(reference_boxes).transpose(0, 1)
         bs, num_queries, _ = boxes_xyxy.shape
-        if self.compilable_cord_cache is None:
-            self.compilable_cord_cache = self._get_coords(H, W, reference_boxes.device)
-            self.compilable_stored_size = (H, W)
 
-        if torch.compiler.is_dynamo_compiling() or self.compilable_stored_size == (
-            H,
-            W,
-        ):
-            # good, hitting the cache, will be compilable
-            coords_h, coords_w = self.compilable_cord_cache
+
+        if torch.onnx.is_in_onnx_export():
+            # 🔒 ONNX export path: NO caching, NO conditions
+            coords_h, coords_w = self._get_coords(H, W, reference_boxes.device)
+
         else:
-            # cache miss, will create compilation issue
-            # In case we're not compiling, we'll still rely on the dict-based cache
-            if feat_size not in self.coord_cache:
-                self.coord_cache[feat_size] = self._get_coords(
-                    H, W, reference_boxes.device
-                )
-            coords_h, coords_w = self.coord_cache[feat_size]
+            if self.compilable_cord_cache is None:
+                self.compilable_cord_cache = self._get_coords(H, W, reference_boxes.device)
+                self.compilable_stored_size = (H, W)
 
-            assert coords_h.shape == (H,)
-            assert coords_w.shape == (W,)
+            if torch.compiler.is_dynamo_compiling() or self.compilable_stored_size == (
+                H,
+                W,
+            ):
+                # good, hitting the cache, will be compilable
+                coords_h, coords_w = self.compilable_cord_cache
+            else:
+                # cache miss, will create compilation issue
+                # In case we're not compiling, we'll still rely on the dict-based cache
+                if feat_size not in self.coord_cache:
+                    self.coord_cache[feat_size] = self._get_coords(
+                        H, W, reference_boxes.device
+                    )
+                coords_h, coords_w = self.coord_cache[feat_size]
+
+                assert coords_h.shape == (H,)
+                assert coords_w.shape == (W,)
 
         deltas_y = coords_h.view(1, -1, 1) - boxes_xyxy.reshape(-1, 1, 4)[:, :, 1:4:2]
         deltas_y = deltas_y.view(bs, num_queries, -1, 2)
@@ -391,19 +398,19 @@ class TransformerDecoder(nn.Module):
             act_ckpt_enable=self.training and self.use_act_checkpoint,
         )  # bs, num_queries, H, n_heads
 
-        if not torch.compiler.is_dynamo_compiling():
+        if not torch.compiler.is_dynamo_compiling() and not torch.onnx.is_in_onnx_export():
             assert deltas_x.shape[:3] == (bs, num_queries, W)
             assert deltas_y.shape[:3] == (bs, num_queries, H)
 
         B = deltas_y.unsqueeze(3) + deltas_x.unsqueeze(
             2
         )  # bs, num_queries, H, W, n_heads
-        if not torch.compiler.is_dynamo_compiling():
+        if not torch.compiler.is_dynamo_compiling() and not torch.onnx.is_in_onnx_export():
             assert B.shape[:4] == (bs, num_queries, H, W)
         B = B.flatten(2, 3)  # bs, num_queries, H*W, n_heads
         B = B.permute(0, 3, 1, 2)  # bs, n_heads, num_queries, H*W
         B = B.contiguous()  # memeff attn likes ordered strides
-        if not torch.compiler.is_dynamo_compiling():
+        if not torch.compiler.is_dynamo_compiling() and not torch.onnx.is_in_onnx_export():
             assert B.shape[2:] == (num_queries, H * W)
         return B
 

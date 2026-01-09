@@ -22,6 +22,11 @@ def interpolate(
     """
     Equivalent to nn.functional.interpolate, but with support for empty channel sizes.
     """
+    if torch.onnx.is_in_onnx_export():
+        return torch.nn.functional.interpolate(
+            input, size, scale_factor, mode, align_corners
+        )
+    
     if input.numel() > 0:
         return torch.nn.functional.interpolate(
             input, size, scale_factor, mode, align_corners

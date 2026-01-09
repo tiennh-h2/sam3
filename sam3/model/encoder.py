@@ -178,9 +178,10 @@ class TransformerEncoderLayer(nn.Module):
             tgt = tgt[: tgt.shape[0] // 2]
         tgt2 = self.norm1(tgt)
         q = k = tgt2 + query_pos if self.pos_enc_at_attn else tgt2
-        tgt2 = self.self_attn(
+        tgt21 = self.self_attn(
             q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
         )[0]
+        tgt2 = tgt21
         tgt = tgt + self.dropout1(tgt2)
         if dac:
             # Recombine

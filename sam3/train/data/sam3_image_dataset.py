@@ -511,6 +511,7 @@ class Sam3ImageDataset(CustomCocoDetectionAPI):
 
                 if len(datapoint.find_queries) == 0:
                     raise DecompressionBombError("No find queries")
+                
                 for transform in self._transforms:
                     datapoint = transform(datapoint, epoch=self.curr_epoch)
 

@@ -853,7 +853,7 @@ def visualize_prompt_overlay(
     plt.show()
 
 
-def plot_results(img, results):
+def plot_results(img, results, save_fp: str=None):
     plt.figure(figsize=(12, 8))
     plt.imshow(img)
     nb_objects = len(results["scores"])
@@ -872,6 +872,9 @@ def plot_results(img, results):
             color=color,
             relative_coords=False,
         )
+    if save_fp:
+        plt.savefig(save_fp, dpi=300)
+        print(f"Saved visualization to {save_fp}")
 
 
 def single_visualization(img, anns, title):

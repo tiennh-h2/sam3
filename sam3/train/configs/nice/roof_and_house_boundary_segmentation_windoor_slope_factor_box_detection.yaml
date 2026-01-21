@@ -7,7 +7,7 @@ defaults:
 # ============================================================================
 paths:
   roboflow_vl_100_root: /home/tien.nguyen/workspace/project/common/data/nice
-  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_and_house_boundary_segmentation_20250119
+  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_box_and_house_boundary_segmentation_windoor_slope_factor_box_detection_20260119
   bpe_path: /home/tien.nguyen/workspace/project/sam3/sam3/assets/bpe_simple_vocab_16e6.txt.gz # This should be under sam3/assets/bpe_simple_vocab_16e6.txt.gz
 
 # Roboflow dataset configuration
@@ -221,7 +221,7 @@ scratch:
   scheduler_warmup: 20
   scheduler_cooldown: 20
 
-  val_batch_size: 1
+  val_batch_size: 16
   collate_fn_val:
     _target_: sam3.train.data.collator.collate_fn_api
     _partial_: true
@@ -337,6 +337,7 @@ trainer:
               gt_path: ${paths.roboflow_vl_100_root}/${roboflow_train.supercategory}/valid/_annotations.coco.json
               tide: False
               iou_type: "segm"
+              non_segm_categories: [2,3,4]
 
   optim:
     amp:
@@ -439,4 +440,4 @@ submitit:
 # ============================================================================
 
 all_roboflow_supercategories:
-  - cropped_elevation_dataset_roof_and_house_segmentation_for_sam3_20260109
+  - cropped_elevation_dataset_roof_and_house_segmentation_windoor_slope_factor_box_detection_for_sam3_20260119

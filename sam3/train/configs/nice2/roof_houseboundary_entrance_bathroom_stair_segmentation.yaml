@@ -7,12 +7,12 @@ defaults:
 # ============================================================================
 paths:
   roboflow_vl_100_root: /home/tien.nguyen/workspace/project/common/data/nice
-  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_and_house_boundary_segmentation_20250119
+  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_houseboundary_entrance_bathroom_stair_segmentation
   bpe_path: /home/tien.nguyen/workspace/project/sam3/sam3/assets/bpe_simple_vocab_16e6.txt.gz # This should be under sam3/assets/bpe_simple_vocab_16e6.txt.gz
 
 # Roboflow dataset configuration
 roboflow_train:
-  num_images: null # Note: This is the number of images used for training. If null, all images are used.
+  num_images: 100 # Note: This is the number of images used for training. If null, all images are used.
   supercategory: ${all_roboflow_supercategories.${string:${submitit.job_array.task_index}}}
 
   # Training transforms pipeline
@@ -172,7 +172,7 @@ scratch:
   use_presence_eval: True
   original_box_postprocessor:
     _target_: sam3.eval.postprocessors.PostProcessImage
-    iou_type: "segm"
+    iou_type: "bbox"
     max_dets_per_img: -1  # infinite detections
     use_original_ids: true
     use_original_sizes_box: true
@@ -251,7 +251,7 @@ trainer:
   max_epochs: 20
   accelerator: cuda
   seed_value: 123
-  val_epoch_freq: 2
+  val_epoch_freq: 10
   mode: train
   gradient_accumulation_steps: ${scratch.gradient_accumulation_steps}
 
@@ -326,7 +326,7 @@ trainer:
       roboflow100:
         detection:
           _target_: sam3.eval.coco_writer.PredictionDumper
-          iou_type: "segm"
+          iou_type: "bbox"
           dump_dir: ${launcher.experiment_log_dir}/dumps/roboflow/${roboflow_train.supercategory}
           merge_predictions: True
           postprocessor: ${scratch.original_box_postprocessor}
@@ -336,7 +336,7 @@ trainer:
             - _target_: sam3.eval.coco_eval_offline.CocoEvaluatorOfflineWithPredFileEvaluators
               gt_path: ${paths.roboflow_vl_100_root}/${roboflow_train.supercategory}/valid/_annotations.coco.json
               tide: False
-              iou_type: "segm"
+              iou_type: "bbox"
 
   optim:
     amp:
@@ -439,4 +439,4 @@ submitit:
 # ============================================================================
 
 all_roboflow_supercategories:
-  - cropped_elevation_dataset_roof_and_house_segmentation_for_sam3_20260109
+  - cropped_full_dataset_roof_houseboundary_entrance_bathroom_stair_segmentation_for_sam3

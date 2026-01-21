@@ -7,12 +7,12 @@ defaults:
 # ============================================================================
 paths:
   roboflow_vl_100_root: /home/tien.nguyen/workspace/project/common/data/nice
-  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_and_house_boundary_segmentation_20250119
+  experiment_log_dir: /home/tien.nguyen/workspace/project/sam3/experiments/roof_and_house_boundary_segmentation_20260109
   bpe_path: /home/tien.nguyen/workspace/project/sam3/sam3/assets/bpe_simple_vocab_16e6.txt.gz # This should be under sam3/assets/bpe_simple_vocab_16e6.txt.gz
 
 # Roboflow dataset configuration
 roboflow_train:
-  num_images: null # Note: This is the number of images used for training. If null, all images are used.
+  num_images: 100 # Note: This is the number of images used for training. If null, all images are used.
   supercategory: ${all_roboflow_supercategories.${string:${submitit.job_array.task_index}}}
 
   # Training transforms pipeline
@@ -326,7 +326,7 @@ trainer:
       roboflow100:
         detection:
           _target_: sam3.eval.coco_writer.PredictionDumper
-          iou_type: "segm"
+          iou_type: "bbox"
           dump_dir: ${launcher.experiment_log_dir}/dumps/roboflow/${roboflow_train.supercategory}
           merge_predictions: True
           postprocessor: ${scratch.original_box_postprocessor}
@@ -336,7 +336,7 @@ trainer:
             - _target_: sam3.eval.coco_eval_offline.CocoEvaluatorOfflineWithPredFileEvaluators
               gt_path: ${paths.roboflow_vl_100_root}/${roboflow_train.supercategory}/valid/_annotations.coco.json
               tide: False
-              iou_type: "segm"
+              iou_type: "bbox"
 
   optim:
     amp:

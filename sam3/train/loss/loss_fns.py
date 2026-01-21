@@ -1021,14 +1021,39 @@ class SemanticSegCriterion(LossWithWeights):
         self.presence_loss = presence_loss
 
     def get_loss(self, out_dict, targets):
-        outputs = out_dict["semantic_seg"]
-        presence_logit = out_dict["presence_logit"]
+        keep = targets["is_valid_mask"]
+        assert keep.shape[0] == targets["num_boxes"].sum()
+
+        idx = 0
+        keep_num_boxes_indices = []
+        for i, num_box in enumerate(targets["num_boxes"]):
+            group_keep = keep[idx : idx + num_box]
+
+            # Enforce consistency: either all kept or all dropped per group
+            assert group_keep.all() or (~group_keep).all(), (
+                f"Inconsistent keep mask in group {i}"
+            )
+
+            if group_keep.all():
+                keep_num_boxes_indices.append(i)
+
+            idx += num_box
+
+        indices = out_dict['indices']
+        keep = (
+            targets["is_valid_mask"]
+            if indices[2] is None
+            else targets["is_valid_mask"][indices[2]]
+        )
+        outputs = out_dict["semantic_seg"][keep_num_boxes_indices]
+        presence_logit = out_dict["presence_logit"][keep] if out_dict["presence_logit"] is not None else out_dict["presence_logit"]
+
         if (
             "semantic_masks" in targets
             and targets["semantic_masks"] is not None
             and targets["semantic_masks"].size(0) > 0
         ):
-            semantic_targets = targets["semantic_masks"]
+            semantic_targets = targets["semantic_masks"][keep]
             with torch.no_grad():
                 if self.downsample:
                     # downsample targets to the size of predictions
@@ -1050,7 +1075,7 @@ class SemanticSegCriterion(LossWithWeights):
                     size = outputs.shape[-2:]
                     segments = (
                         F.interpolate(
-                            targets["masks"].float().unsqueeze(1),
+                            targets["masks"][keep].float().unsqueeze(1),
                             size=size,
                             mode="bilinear",
                             align_corners=False,
@@ -1059,11 +1084,11 @@ class SemanticSegCriterion(LossWithWeights):
                         .bool()
                     )
                 else:
-                    segments = targets["masks"].bool()
+                    segments = targets["masks"][keep].bool()
 
                 # the annotations are for instance segmentation, so we merge them to get semantic segmentation
                 semantic_targets = instance_masks_to_semantic_masks(
-                    segments, targets["num_boxes"]
+                    segments, targets["num_boxes"][keep_num_boxes_indices]
                 )
 
         if not self.downsample:

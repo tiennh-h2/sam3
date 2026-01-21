@@ -11,6 +11,7 @@ we may need to split the inference process for a given image in several chunks.
 import logging
 from collections import defaultdict
 
+import numpy as np
 import torch
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -64,10 +65,41 @@ class COCOevalCustom(COCOeval):
     """
 
     def __init__(
-        self, cocoGt=None, cocoDt=None, iouType="segm", dt_only_positive=False
+        self, cocoGt=None, cocoDt=None, iouType="segm", dt_only_positive=False, non_segm_categories=None
     ):
         super().__init__(cocoGt, cocoDt, iouType)
         self.dt_only_positive = dt_only_positive
+        self.non_segm_categories = non_segm_categories or []
+
+    def computeIoU(self, imgId, catId):
+        from pycocotools.cocoeval import maskUtils
+        p = self.params
+        if p.useCats:
+            gt = self._gts[imgId,catId]
+            dt = self._dts[imgId,catId]
+        else:
+            gt = [_ for cId in p.catIds for _ in self._gts[imgId,cId]]
+            dt = [_ for cId in p.catIds for _ in self._dts[imgId,cId]]
+        if len(gt) == 0 and len(dt) ==0:
+            return []
+        inds = np.argsort([-d['score'] for d in dt], kind='mergesort')
+        dt = [dt[i] for i in inds]
+        if len(dt) > p.maxDets[-1]:
+            dt=dt[0:p.maxDets[-1]]
+
+        if p.iouType == 'segm':
+            g = [g['bbox'] if g['category_id'] in self.non_segm_categories else g['segmentation'] for g in gt]
+            d = [d['bbox'] if d['category_id'] in self.non_segm_categories else d['segmentation'] for d in dt]
+        elif p.iouType == 'bbox':
+            g = [g['bbox'] for g in gt]
+            d = [d['bbox'] for d in dt]
+        else:
+            raise Exception('unknown iouType for iou computation')
+
+        # compute iou between each dt and gt region
+        iscrowd = [int(o['iscrowd']) for o in gt]
+        ious = maskUtils.iou(d,g,iscrowd)
+        return ious
 
     def _prepare(self):
         """
@@ -78,6 +110,8 @@ class COCOevalCustom(COCOeval):
         def _toMask(anns, coco):
             # modify ann['segmentation'] by reference
             for ann in anns:
+                if ann["segmentation"] is None:
+                    continue
                 rle = coco.annToRLE(ann)
                 ann["segmentation"] = rle
 
@@ -131,11 +165,13 @@ class CocoEvaluatorOfflineWithPredFileEvaluators:
         tide: bool = True,
         iou_type: str = "bbox",
         positive_split=False,
+        non_segm_categories=None,
     ):
         self.gt_path = gt_path
         self.tide_enabled = HAS_TIDE and tide
         self.positive_split = positive_split
         self.iou_type = iou_type
+        self.non_segm_categories = non_segm_categories or []
 
     def evaluate(self, dumped_file):
         if not is_main_process():
@@ -151,7 +187,7 @@ class CocoEvaluatorOfflineWithPredFileEvaluators:
         # Run the evaluation
         logging.info("Coco evaluator: Running evaluation")
         coco_eval = COCOevalCustom(
-            self.gt, cocoDt, iouType=self.iou_type, dt_only_positive=self.positive_split
+            self.gt, cocoDt, iouType=self.iou_type, dt_only_positive=self.positive_split, non_segm_categories=self.non_segm_categories
         )
         coco_eval.evaluate()
         coco_eval.accumulate()

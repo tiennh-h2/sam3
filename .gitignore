@@ -130,6 +130,7 @@ dmypy.json
 weights/
 checkpoints/
 sam3_logs/
+scripts/models/
 
 # Data files
 *.h5

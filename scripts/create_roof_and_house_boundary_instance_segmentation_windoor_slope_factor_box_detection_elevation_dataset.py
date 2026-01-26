@@ -18,9 +18,9 @@ NEW_SLOPE_FACTOR_CATEGORY_ID = 4
 SPLIT_RATIO = 0.8
 random.seed(42)
 
-raw_data_dir = "/home/tien.nguyen/workspace/project/common/data/nice/cropped_elevation_dataset_20260109"
-raw_test_data_dir = "/home/tien.nguyen/workspace/project/common/data/nice/cropped_test_elevation_dataset_20260109"
-save_path = "/home/tien.nguyen/workspace/project/common/data/nice/cropped_elevation_dataset_roof_and_house_segmentation_windoor_slope_factor_box_detection_for_sam3_20260119"
+raw_data_dir = "/home/tien.nguyen/workspace/project/common/data/nice/nice-lakefs/main_data/coco_raw/trainval"
+raw_test_data_dir = "/home/tien.nguyen/workspace/project/common/data/nice/nice-lakefs/main_data/coco_raw/test"
+save_path = "/home/tien.nguyen/workspace/project/common/data/nice/uncropped_elevation_dataset_roof_and_house_segmentation_windoor_slope_factor_box_detection_for_sam3_20260121"
 
 train_dir = os.path.join(save_path, "train")
 val_dir = os.path.join(save_path, "valid")
@@ -41,20 +41,25 @@ for batch in os.listdir(raw_data_dir):
         task_dir = os.path.join(raw_data_dir, batch, task)
         coco = json.load(open(os.path.join(task_dir, "annotations", "instances_default.json")))
 
-        chosen_anns = [a for a in coco["annotations"] if a["category_id"] in [ROOF_CATEGORY_ID, HOUSE_BOUNDARY_CATEGORY_ID, WINDOW_EP_CATEGORY_ID, DOOR_EP_CATEGORY_ID, SLOPE_FACTOR_CATEGORY_ID]]
-
         img_id_map = {}
         for img in coco["images"]:
+            if "AE" not in img["file_name"]:
+                continue
             img_id_map[img["id"]] = img_id
             img["id"] = img_id
-            img["src_path"] = os.path.join(task_dir, "images", img["file_name"])
+            img["src_path"] = os.path.join(task_dir, "images", "default", img["file_name"])
             img["file_name"] = os.path.basename(img["file_name"])
             img_id += 1
             all_images.append(img)
 
+        chosen_anns = [a for a in coco["annotations"] if a['image_id'] in img_id_map and a["category_id"] in [ROOF_CATEGORY_ID, HOUSE_BOUNDARY_CATEGORY_ID, WINDOW_EP_CATEGORY_ID, DOOR_EP_CATEGORY_ID, SLOPE_FACTOR_CATEGORY_ID]]
+
         for ann in chosen_anns:
             ann["id"] = ann_id
-            ann["image_id"] = img_id_map[ann["image_id"]]
+            try:
+                ann["image_id"] = img_id_map[ann["image_id"]]
+            except:
+                pass
             all_images_in_annotations.add(ann["image_id"])
             if ann["category_id"] == ROOF_CATEGORY_ID:
                 ann["category_id"] = NEW_ROOF_CATEGORY_ID
@@ -85,16 +90,18 @@ for batch in os.listdir(raw_test_data_dir):
         task_dir = os.path.join(raw_test_data_dir, batch, task)
         coco = json.load(open(os.path.join(task_dir, "annotations", "instances_default.json")))
 
-        chosen_anns = [a for a in coco["annotations"] if a["category_id"] in [ROOF_CATEGORY_ID, HOUSE_BOUNDARY_CATEGORY_ID, WINDOW_EP_CATEGORY_ID, DOOR_EP_CATEGORY_ID, SLOPE_FACTOR_CATEGORY_ID]]
-
         img_id_map = {}
         for img in coco["images"]:
+            if "AE" not in img["file_name"]:
+                continue
             img_id_map[img["id"]] = img_id
             img["id"] = img_id
-            img["src_path"] = os.path.join(task_dir, "images", img["file_name"])
+            img["src_path"] = os.path.join(task_dir, "images", "default", img["file_name"])
             img["file_name"] = os.path.basename(img["file_name"])
             img_id += 1
             all_test_images.append(img)
+
+        chosen_anns = [a for a in coco["annotations"] if a['image_id'] in img_id_map and a["category_id"] in [ROOF_CATEGORY_ID, HOUSE_BOUNDARY_CATEGORY_ID, WINDOW_EP_CATEGORY_ID, DOOR_EP_CATEGORY_ID, SLOPE_FACTOR_CATEGORY_ID]]
 
         for ann in chosen_anns:
             ann["id"] = ann_id
